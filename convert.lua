@@ -1,6 +1,13 @@
 HDR_LEN = 4
 DEFAULT_PORT = 5124
 
+TLV_TYPE_INFO =         1
+TLV_TYPE_CONNECT =      10
+TLV_TYPE_EXT_TCP_HDR =  20
+TLV_TYPE_SUP_TCP_EXT =  21
+TLV_TYPE_COOKIE =       22
+TLV_TYPE_ERROR =        30
+
 convert_protocol = Proto('Convert',  '0-RTT TCP Converter')
 
 convert_protocol.prefs.port = Pref.uint('port', DEFAULT_PORT, 'Converter port')
@@ -32,12 +39,12 @@ tcp_len_f       = Field.new('tcp.len')
 function get_tlv_name(tlv_type)
     local tlv_name = 'Unknown TLV type'
 
-        if tlv_type == 1    then tlv_name = 'Info TLV'
-    elseif tlv_type == 10   then tlv_name = 'Connect TLV'
-    elseif tlv_type == 20   then tlv_name = 'Extended TCP Header TLV'
-    elseif tlv_type == 21   then tlv_name = 'Supported TCP Extensions TLV'
-    elseif tlv_type == 22   then tlv_name = 'Cookie TLV'
-    elseif tlv_type == 30   then tlv_name = 'Error TLV'
+        if tlv_type == TLV_TYPE_INFO        then tlv_name = 'Info TLV'
+    elseif tlv_type == TLV_TYPE_CONNECT     then tlv_name = 'Connect TLV'
+    elseif tlv_type == TLV_TYPE_EXT_TCP_HDR then tlv_name = 'Extended TCP Header TLV'
+    elseif tlv_type == TLV_TYPE_SUP_TCP_EXT then tlv_name = 'Supported TCP Extensions TLV'
+    elseif tlv_type == TLV_TYPE_COOKIE      then tlv_name = 'Cookie TLV'
+    elseif tlv_type == TLV_TYPE_ERROR       then tlv_name = 'Error TLV'
     end
 
     return tlv_name
@@ -70,6 +77,11 @@ end
 
 function mark_stream_as_convert()
     is_convert_stream[tostring(tcp_stream_f())] = true
+end
+
+
+function parse_tlv_value(tlv_tree, tlv_type, buffer, value_offset, value_length)
+    tlv_tree:add(tlv_value_f, buffer(value_offset,value_length))
 end
 
 -- For a given TCP connection, we need to remember when we finished parsing the
@@ -121,7 +133,7 @@ function convert_protocol.dissector(buffer, pinfo, tree)
 
         tlv_tree:add(tlv_type_f,   buffer(offset,1)):append_text(' (' .. tlv_name .. ')')
         tlv_tree:add(tlv_length_f, buffer(offset+1,1)):append_text(' (' .. tlv_bytes .. ' bytes)')
-        tlv_tree:add(tlv_value_f,  buffer(offset+2,tlv_bytes-2))
+        parse_tlv_value(tlv_tree, tlv_type, buffer, offset+2, tlv_bytes-2)
 
         offset = offset + tlv_bytes
     end
