@@ -21,9 +21,14 @@ tlv_type_f     = ProtoField.uint8( 'convert.tlv_type',     'Type',          base
 tlv_length_f   = ProtoField.uint8( 'convert.tlv_length',   'Length',        base.DEC)
 tlv_value_f    = ProtoField.bytes( 'convert.tlv_value',    'Value')
 
+connect_port_f     = ProtoField.uint16('convert.connect.port',         'Port')
+connect_addr_f     = ProtoField.bytes( 'convert.connect.addr',         'Address')
+connect_tcp_opts_f = ProtoField.bytes( 'convert.connect.tcp_optons',   'TCP Options')
+
 convert_protocol.fields = {
     version_f, total_length_f, unassigned_f,
-    tlv_f, tlv_type_f, tlv_length_f, tlv_value_f
+    tlv_f, tlv_type_f, tlv_length_f, tlv_value_f,
+    connect_port_f, connect_addr_f, connect_tcp_opts_f
 }
 
 tcp_stream_f    = Field.new('tcp.stream')
@@ -79,9 +84,14 @@ function mark_stream_as_convert()
     is_convert_stream[tostring(tcp_stream_f())] = true
 end
 
-
-function parse_tlv_value(tlv_tree, tlv_type, buffer, value_offset, value_length)
-    tlv_tree:add(tlv_value_f, buffer(value_offset,value_length))
+function parse_tlv_value(tlv_tree, tlv_type, buffer, val_offset, val_length)
+    if tlv_type == TLV_TYPE_CONNECT then
+        tlv_tree:add(connect_port_f, buffer(val_offset,2))
+        tlv_tree:add(connect_addr_f, buffer(val_offset+2,16))
+        tlv_tree:add(connect_tcp_opts_f, buffer(val_offset+18,val_length-18))
+    else
+        tlv_tree:add(tlv_value_f, buffer(val_offset,val_length))
+    end
 end
 
 -- For a given TCP connection, we need to remember when we finished parsing the
