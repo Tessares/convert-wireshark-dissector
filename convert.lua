@@ -22,6 +22,10 @@ ip_dst_f        = Field.new('ip.dst')
 tcp_srcport_f   = Field.new('tcp.srcport')
 tcp_dstport_f   = Field.new('tcp.dstport')
 
+tcp_syn_f       = Field.new('tcp.flags.syn')
+tcp_ack_f       = Field.new('tcp.flags.ack')
+tcp_len_f       = Field.new('tcp.len')
+
 function get_tlv_name(tlv_type)
     local tlv_name = 'Unknown TLV type'
 
@@ -36,31 +40,64 @@ function get_tlv_name(tlv_type)
     return tlv_name
 end
 
+function get_stream_dir_key()
+    return tostring(tcp_stream_f()) ..
+           tostring(ip_src_f()) ..
+           tostring(ip_dst_f()) ..
+           tostring(tcp_srcport_f()) ..
+           tostring(tcp_dstport_f())
+end
+
+function is_past_convert_msg(key, pkt_num)
+    return convert_end_pkt_num[key] and
+           pkt_num > convert_end_pkt_num[key]
+end
+
+-- Assume for the time being that any TCP stream that starts with a SYN with
+-- a payload carries Convert data.
+function is_convert_syn()
+    return tostring(tcp_syn_f()) == '1' and
+           tostring(tcp_ack_f()) == '0' and
+           tostring(tcp_len_f()) ~= '0'
+end
+
+function belongs_to_convert_stream()
+    return is_convert_stream[tostring(tcp_stream_f())] == true
+end
+
+function mark_stream_as_convert()
+    is_convert_stream[tostring(tcp_stream_f())] = true
+end
+
 -- For a given TCP connection, we need to remember when we finished parsing the
 -- Convert message in each direction. After that point the dissector is a NOOP.
 -- We thus store the last pkt number that contained Convert protocol data in
 -- each direction for each tcp.stream. For the moment, we assume the first pkt
 -- with Convert data contains the full Convert message.
 convert_end_pkt_num = {}
+is_convert_stream = {}
 
 function convert_protocol.dissector(buffer, pinfo, tree)
-    -- Empty TCP packets do not have Convert data. Ignore.
+    -- Empty TCP packets, cannot be Convert. Ignore.
     local msg_length = buffer:len()
     if msg_length == 0 then return end
 
-    local tcp_stream    = tostring(tcp_stream_f())
-    local ip_src        = tostring(ip_src_f())
-    local ip_dst        = tostring(ip_dst_f())
-    local tcp_srcport   = tostring(tcp_srcport_f())
-    local tcp_dstport   = tostring(tcp_dstport_f())
-    local key           = tcp_stream .. ip_src .. ip_dst .. tcp_srcport .. tcp_dstport
-
-    -- We are past the end of the Convert message. Ignore.
-    if convert_end_pkt_num[key] and
-       pinfo.number > convert_end_pkt_num[key] then
+    -- Past the end of the Convert message. Ignore.
+    local stream_dir_key = get_stream_dir_key()
+    if is_past_convert_msg(stream_dir_key, pinfo.number) then
         return
     end
 
+    if is_convert_syn() then
+        mark_stream_as_convert()
+    end
+
+    -- Does not belong to a Convert stream. Ignore.
+    if not belongs_to_convert_stream() then
+        return
+    end
+
+    -- We are now parsing a Convert message.
     pinfo.cols.protocol = convert_protocol.name
     local subtree = tree:add(convert_protocol, buffer(), 'Convert Protocol Data')
     local total_length = buffer(1,1):uint() * 4
@@ -86,7 +123,8 @@ function convert_protocol.dissector(buffer, pinfo, tree)
         offset = offset + tlv_bytes
     end
 
-    convert_end_pkt_num[key] = pinfo.number
+    -- Mark end of Convert for stream direction.
+    convert_end_pkt_num[stream_dir_key] = pinfo.number
 end
 
 local tcp_port = DissectorTable.get('tcp.port')
