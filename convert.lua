@@ -1,6 +1,9 @@
 HDR_LEN = 4
+DEFAULT_PORT = 5124
 
 convert_protocol = Proto('Convert',  '0-RTT TCP Converter')
+
+convert_protocol.prefs.port = Pref.uint('port', DEFAULT_PORT, 'Converter port')
 
 version_f      = ProtoField.uint8( 'convert.version',      'Version',       base.DEC)
 total_length_f = ProtoField.uint8( 'convert.total_length', 'Total length',  base.DEC)
@@ -127,5 +130,13 @@ function convert_protocol.dissector(buffer, pinfo, tree)
     convert_end_pkt_num[stream_dir_key] = pinfo.number
 end
 
-local tcp_port = DissectorTable.get('tcp.port')
-tcp_port:add(5124, convert_protocol)
+function convert_protocol.prefs_changed()
+    tcp_port:remove(registered_port, convert_protocol)
+    registered_port = convert_protocol.prefs.port
+    tcp_port:add(registered_port, convert_protocol)
+end
+
+-- Initial registration
+tcp_port = DissectorTable.get('tcp.port')
+registered_port = convert_protocol.prefs.port
+tcp_port:add(registered_port, convert_protocol)
