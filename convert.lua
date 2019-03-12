@@ -12,23 +12,24 @@ convert_protocol = Proto('Convert',  '0-RTT TCP Converter')
 
 convert_protocol.prefs.port = Pref.uint('port', DEFAULT_PORT, 'Converter port')
 
-version_f      = ProtoField.uint8( 'convert.version',      'Version',       base.DEC)
-total_length_f = ProtoField.uint8( 'convert.total_length', 'Total length',  base.DEC)
-unassigned_f   = ProtoField.uint16('convert.unassigned',   'Unassigned',    base.DEC)
-
-tlv_f          = ProtoField.bytes( 'convert.tlv',          'TLV')
-tlv_type_f     = ProtoField.uint8( 'convert.tlv_type',     'Type',          base.DEC)
-tlv_length_f   = ProtoField.uint8( 'convert.tlv_length',   'Length',        base.DEC)
-tlv_value_f    = ProtoField.bytes( 'convert.tlv_value',    'Value')
-
-connect_port_f     = ProtoField.uint16('convert.connect.port',         'Port')
-connect_addr_f     = ProtoField.bytes( 'convert.connect.addr',         'Address')
-connect_tcp_opts_f = ProtoField.bytes( 'convert.connect.tcp_optons',   'TCP Options')
+version_f               = ProtoField.uint8( 'convert.version',                  'Version')
+total_length_f          = ProtoField.uint8( 'convert.total_length',             'Total length')
+unassigned_f            = ProtoField.uint16('convert.unassigned',               'Unassigned')
+tlv_f                   = ProtoField.bytes( 'convert.tlv',                      'TLV')
+tlv_type_f              = ProtoField.uint8( 'convert.tlv_type',                 'Type')
+tlv_length_f            = ProtoField.uint8( 'convert.tlv_length',               'Length')
+tlv_value_f             = ProtoField.bytes( 'convert.tlv_value',                'Value')
+connect_port_f          = ProtoField.uint16('convert.connect.port',             'Port')
+connect_addr_f          = ProtoField.ipv6(  'convert.connect.addr',             'Address')
+connect_tcp_opts_f      = ProtoField.bytes( 'convert.connect.tcp_optons',       'TCP Options')
+ext_tcp_hdr_una_f       = ProtoField.uint16('convert.ext_tcp_hdr.unassigned',   'Unassigned')
+ext_tcp_hdr_hdr_f       = ProtoField.bytes( 'convert.ext_tcp_hdr.tcp_header',   'TCP Header')
 
 convert_protocol.fields = {
     version_f, total_length_f, unassigned_f,
     tlv_f, tlv_type_f, tlv_length_f, tlv_value_f,
-    connect_port_f, connect_addr_f, connect_tcp_opts_f
+    connect_port_f, connect_addr_f, connect_tcp_opts_f,
+    ext_tcp_hdr_una_f, ext_tcp_hdr_hdr_f
 }
 
 tcp_stream_f    = Field.new('tcp.stream')
@@ -89,6 +90,9 @@ function parse_tlv_value(tlv_tree, tlv_type, buffer, val_offset, val_length)
         tlv_tree:add(connect_port_f, buffer(val_offset,2))
         tlv_tree:add(connect_addr_f, buffer(val_offset+2,16))
         tlv_tree:add(connect_tcp_opts_f, buffer(val_offset+18,val_length-18))
+    elseif tlv_type == TLV_TYPE_EXT_TCP_HDR then
+        tlv_tree:add(ext_tcp_hdr_una_f, buffer(val_offset,2))
+        tlv_tree:add(ext_tcp_hdr_hdr_f, buffer(val_offset+2,val_length-2))
     else
         tlv_tree:add(tlv_value_f, buffer(val_offset,val_length))
     end
