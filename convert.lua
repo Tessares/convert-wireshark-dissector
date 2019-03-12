@@ -1,19 +1,18 @@
-HDR_LEN = 4
-DEFAULT_PORT = 5124
+HDR_LEN                 = 4
+DEFAULT_PORT            = 5124
 
-TLV_TYPE_INFO =         1
-TLV_TYPE_CONNECT =      10
-TLV_TYPE_EXT_TCP_HDR =  20
-TLV_TYPE_SUP_TCP_EXT =  21
-TLV_TYPE_COOKIE =       22
-TLV_TYPE_ERROR =        30
+TLV_TYPE_INFO           = 1
+TLV_TYPE_CONNECT        = 10
+TLV_TYPE_EXT_TCP_HDR    = 20
+TLV_TYPE_SUP_TCP_EXT    = 21
+TLV_TYPE_COOKIE         = 22
+TLV_TYPE_ERROR          = 30
 
-convert_protocol = Proto('Convert',  '0-RTT TCP Converter')
-
-convert_protocol.prefs.port = Pref.uint('port', DEFAULT_PORT, 'Converter port')
+convert_prot            = Proto('Convert',  '0-RTT TCP Convert Protocol')
+convert_prot.prefs.port = Pref.uint('port', DEFAULT_PORT, 'Converter Port')
 
 version_f               = ProtoField.uint8( 'convert.version',                  'Version')
-total_length_f          = ProtoField.uint8( 'convert.total_length',             'Total length')
+total_length_f          = ProtoField.uint8( 'convert.total_length',             'Total Length')
 unassigned_f            = ProtoField.uint16('convert.unassigned',               'Unassigned')
 tlv_f                   = ProtoField.bytes( 'convert.tlv',                      'TLV')
 tlv_type_f              = ProtoField.uint8( 'convert.tlv_type',                 'Type')
@@ -24,26 +23,28 @@ connect_addr_f          = ProtoField.ipv6(  'convert.connect.addr',             
 connect_tcp_opts_f      = ProtoField.bytes( 'convert.connect.tcp_optons',       'TCP Options')
 ext_tcp_hdr_una_f       = ProtoField.uint16('convert.ext_tcp_hdr.unassigned',   'Unassigned')
 ext_tcp_hdr_hdr_f       = ProtoField.bytes( 'convert.ext_tcp_hdr.tcp_header',   'TCP Header')
+error_code_f            = ProtoField.uint8( 'convert.error.code',               'Error Code')
+error_value_f           = ProtoField.bytes( 'convert.error.value',              'Value')
 
-convert_protocol.fields = {
+convert_prot.fields = {
     version_f, total_length_f, unassigned_f,
     tlv_f, tlv_type_f, tlv_length_f, tlv_value_f,
     connect_port_f, connect_addr_f, connect_tcp_opts_f,
-    ext_tcp_hdr_una_f, ext_tcp_hdr_hdr_f
+    ext_tcp_hdr_una_f, ext_tcp_hdr_hdr_f,
+    error_code_f, error_value_f
 }
 
-tcp_stream_f    = Field.new('tcp.stream')
-ip_src_f        = Field.new('ip.src')
-ip_dst_f        = Field.new('ip.dst')
-tcp_srcport_f   = Field.new('tcp.srcport')
-tcp_dstport_f   = Field.new('tcp.dstport')
-
-tcp_syn_f       = Field.new('tcp.flags.syn')
-tcp_ack_f       = Field.new('tcp.flags.ack')
-tcp_len_f       = Field.new('tcp.len')
+tcp_stream_f            = Field.new('tcp.stream')
+ip_src_f                = Field.new('ip.src')
+ip_dst_f                = Field.new('ip.dst')
+tcp_srcport_f           = Field.new('tcp.srcport')
+tcp_dstport_f           = Field.new('tcp.dstport')
+tcp_syn_f               = Field.new('tcp.flags.syn')
+tcp_ack_f               = Field.new('tcp.flags.ack')
+tcp_len_f               = Field.new('tcp.len')
 
 function get_tlv_name(tlv_type)
-    local tlv_name = 'Unknown TLV type'
+    local tlv_name = 'Unknown TLV Type'
 
         if tlv_type == TLV_TYPE_INFO        then tlv_name = 'Info TLV'
     elseif tlv_type == TLV_TYPE_CONNECT     then tlv_name = 'Connect TLV'
@@ -54,6 +55,24 @@ function get_tlv_name(tlv_type)
     end
 
     return tlv_name
+end
+
+function get_error_name(error_code)
+    local error_name = 'Unknown Error Code'
+
+         if  error_code == 0    then error_name = 'Unsupported Version'
+     elseif  error_code == 1    then error_name = 'Malformed Message'
+     elseif  error_code == 2    then error_name = 'Unsupported Message'
+     elseif  error_code == 3    then error_name = 'Missing Cookie'
+     elseif  error_code == 32   then error_name = 'Not Authorized'
+     elseif  error_code == 33   then error_name = 'Unsupported TCP Option'
+     elseif  error_code == 64   then error_name = 'Resource Exceeded'
+     elseif  error_code == 65   then error_name = 'Network Failure'
+     elseif  error_code == 96   then error_name = 'Connection Reset'
+     elseif  error_code == 97   then error_name = 'Destination Unreachable'
+     end
+
+    return error_name
 end
 
 function get_stream_dir_key()
@@ -87,14 +106,19 @@ end
 
 function parse_tlv_value(tlv_tree, tlv_type, buffer, val_offset, val_length)
     if tlv_type == TLV_TYPE_CONNECT then
-        tlv_tree:add(connect_port_f, buffer(val_offset,2))
-        tlv_tree:add(connect_addr_f, buffer(val_offset+2,16))
-        tlv_tree:add(connect_tcp_opts_f, buffer(val_offset+18,val_length-18))
+        tlv_tree:add(connect_port_f, buffer(val_offset, 2))
+        tlv_tree:add(connect_addr_f, buffer(val_offset + 2 ,16))
+        tlv_tree:add(connect_tcp_opts_f, buffer(val_offset + 18, val_length - 18))
     elseif tlv_type == TLV_TYPE_EXT_TCP_HDR then
-        tlv_tree:add(ext_tcp_hdr_una_f, buffer(val_offset,2))
-        tlv_tree:add(ext_tcp_hdr_hdr_f, buffer(val_offset+2,val_length-2))
+        tlv_tree:add(ext_tcp_hdr_una_f, buffer(val_offset, 2))
+        tlv_tree:add(ext_tcp_hdr_hdr_f, buffer(val_offset + 2, val_length - 2))
+    elseif tlv_type == TLV_TYPE_ERROR then
+        local error_code = buffer(offset, 1):uint()
+        local error_name = get_error_name(error_code)
+        tlv_tree:add(error_code_f, buffer(val_offset, 1)):append_text(' (' .. error_name .. ')')
+        tlv_tree:add(error_value_f, buffer(val_offset + 1, val_length - 1))
     else
-        tlv_tree:add(tlv_value_f, buffer(val_offset,val_length))
+        tlv_tree:add(tlv_value_f, buffer(val_offset, val_length))
     end
 end
 
@@ -106,7 +130,7 @@ end
 convert_end_pkt_num = {}
 is_convert_stream = {}
 
-function convert_protocol.dissector(buffer, pinfo, tree)
+function convert_prot.dissector(buffer, pinfo, tree)
     -- Empty TCP packets, cannot be Convert. Ignore.
     local msg_length = buffer:len()
     if msg_length == 0 then return end
@@ -127,12 +151,12 @@ function convert_protocol.dissector(buffer, pinfo, tree)
     end
 
     -- We are now parsing a Convert message.
-    pinfo.cols.protocol = convert_protocol.name
-    local subtree = tree:add(convert_protocol, buffer(), 'Convert Protocol Data')
+    pinfo.cols.protocol = convert_prot.name
+    local subtree = tree:add(convert_prot, buffer(), '0-RTT TCP Convert Protocol Data')
     local total_length = buffer(1,1):uint() * 4
 
     subtree:add(version_f,        buffer(0,1))
-    subtree:add(total_length_f,   buffer(1,1)):append_text(' (' .. total_length .. ' bytes)')
+    subtree:add(total_length_f,   buffer(1,1)):append_text(' (' .. total_length .. ' Bytes)')
     subtree:add(unassigned_f,     buffer(2,2))
 
     local offset = HDR_LEN
@@ -146,7 +170,7 @@ function convert_protocol.dissector(buffer, pinfo, tree)
         tlv_tree:set_text(tlv_name)
 
         tlv_tree:add(tlv_type_f,   buffer(offset,1)):append_text(' (' .. tlv_name .. ')')
-        tlv_tree:add(tlv_length_f, buffer(offset+1,1)):append_text(' (' .. tlv_bytes .. ' bytes)')
+        tlv_tree:add(tlv_length_f, buffer(offset+1,1)):append_text(' (' .. tlv_bytes .. ' Bytes)')
         parse_tlv_value(tlv_tree, tlv_type, buffer, offset+2, tlv_bytes-2)
 
         offset = offset + tlv_bytes
@@ -156,13 +180,13 @@ function convert_protocol.dissector(buffer, pinfo, tree)
     convert_end_pkt_num[stream_dir_key] = pinfo.number
 end
 
-function convert_protocol.prefs_changed()
-    tcp_port:remove(registered_port, convert_protocol)
-    registered_port = convert_protocol.prefs.port
-    tcp_port:add(registered_port, convert_protocol)
+function convert_prot.prefs_changed()
+    tcp_port:remove(registered_port, convert_prot)
+    registered_port = convert_prot.prefs.port
+    tcp_port:add(registered_port, convert_prot)
 end
 
 -- Initial registration
 tcp_port = DissectorTable.get('tcp.port')
-registered_port = convert_protocol.prefs.port
-tcp_port:add(registered_port, convert_protocol)
+registered_port = convert_prot.prefs.port
+tcp_port:add(registered_port, convert_prot)
