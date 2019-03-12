@@ -134,7 +134,9 @@ is_convert_stream = {}
 function convert_prot.dissector(buffer, pinfo, tree)
     -- Empty TCP packets, cannot be Convert. Ignore.
     local msg_length = buffer:len()
-    if msg_length == 0 then return end
+    if msg_length == 0 then
+        return
+    end
 
     -- Past the end of the Convert message. Ignore.
     local stream_dir_key = get_stream_dir_key()
@@ -155,8 +157,8 @@ function convert_prot.dissector(buffer, pinfo, tree)
     -- We are now parsing a Convert message.
     pinfo.cols.protocol = convert_prot.name
     local subtree = tree:add(convert_prot, buffer(), '0-RTT TCP Convert Protocol Data')
-    local version = buffer(0,1):uint()
-    local total_length = buffer(1,1):uint() * 4
+    local version = buffer(0, 1):uint()
+    local total_length = buffer(1, 1):uint() * 4
 
     -- Different version. Stop parsing this stream direction.
     if version ~= VERSION then
@@ -164,23 +166,25 @@ function convert_prot.dissector(buffer, pinfo, tree)
         return
     end
 
-    subtree:add(version_f,        buffer(0,1))
-    subtree:add(total_length_f,   buffer(1,1)):append_text(' (' .. total_length .. ' Bytes)')
-    subtree:add(unassigned_f,     buffer(2,2))
+    -- Parse Header.
+    subtree:add(version_f,        buffer(0, 1))
+    subtree:add(total_length_f,   buffer(1, 1)):append_text(' (' .. total_length .. ' Bytes)')
+    subtree:add(unassigned_f,     buffer(2, 2))
 
+    -- Parse TLVs.
     local offset = HDR_LEN
     while offset < msg_length do
-        local tlv_type   = buffer(offset,1):uint()
-        local tlv_length = buffer(offset+1,1):uint()
+        local tlv_type   = buffer(offset, 1):uint()
+        local tlv_length = buffer(offset + 1, 1):uint()
         local tlv_name   = get_tlv_name(tlv_type)
         local tlv_bytes  = tlv_length * 4
 
         tlv_tree = subtree:add(tlv_f, buffer(offset, tlv_bytes))
         tlv_tree:set_text(tlv_name)
+        tlv_tree:add(tlv_type_f,   buffer(offset, 1)):append_text(' (' .. tlv_name .. ')')
+        tlv_tree:add(tlv_length_f, buffer(offset + 1, 1)):append_text(' (' .. tlv_bytes .. ' Bytes)')
 
-        tlv_tree:add(tlv_type_f,   buffer(offset,1)):append_text(' (' .. tlv_name .. ')')
-        tlv_tree:add(tlv_length_f, buffer(offset+1,1)):append_text(' (' .. tlv_bytes .. ' Bytes)')
-        parse_tlv_value(tlv_tree, tlv_type, buffer, offset+2, tlv_bytes-2)
+        parse_tlv_value(tlv_tree, tlv_type, buffer, offset + 2, tlv_bytes - 2)
 
         offset = offset + tlv_bytes
     end
