@@ -1,3 +1,4 @@
+VERSION                 = 1 -- draft-ietf-tcpm-converters-06
 HDR_LEN                 = 4
 DEFAULT_PORT            = 5124
 
@@ -141,6 +142,7 @@ function convert_prot.dissector(buffer, pinfo, tree)
         return
     end
 
+    -- Assume Convert Header sits in the SYN. Otherwise Ignore.
     if is_convert_syn() then
         mark_stream_as_convert()
     end
@@ -153,7 +155,14 @@ function convert_prot.dissector(buffer, pinfo, tree)
     -- We are now parsing a Convert message.
     pinfo.cols.protocol = convert_prot.name
     local subtree = tree:add(convert_prot, buffer(), '0-RTT TCP Convert Protocol Data')
+    local version = buffer(0,1):uint()
     local total_length = buffer(1,1):uint() * 4
+
+    -- Different version. Stop parsing this stream direction.
+    if version ~= VERSION then
+        convert_end_pkt_num[stream_dir_key] = pinfo.number
+        return
+    end
 
     subtree:add(version_f,        buffer(0,1))
     subtree:add(total_length_f,   buffer(1,1)):append_text(' (' .. total_length .. ' Bytes)')
