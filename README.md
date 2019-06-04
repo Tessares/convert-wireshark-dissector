@@ -14,15 +14,15 @@ will thus not be dissected as Convert.
 
 Simply drop this file into your Wireshark plugin folder.
 
-On Unix-like systems, the personal plugin folder is
-~/.local/lib/wireshark/plugins.
+On **Unix-like** systems, the personal plugin folder is
+`~/.local/lib/wireshark/plugins`.
 
-If you are running on macOS and Wireshark is installed as an application
-bundle, the global plugin folder is %APPDIR%/Contents/PlugIns/wireshark,
-otherwise it’s INSTALLDIR/lib/wireshark/plugins.
+If you are running on **macOS** and Wireshark is installed as an application
+bundle, the global plugin folder is `%APPDIR%/Contents/PlugIns/wireshark`,
+otherwise it's `<INSTALLDIR>/lib/wireshark/plugins`.
 
-On Windows, the personal plugin folder is %APPDATA%\Wireshark\plugins while the
-global plugin folder is WIRESHARK\plugins.
+On **Windows**, the personal plugin folder is `%APPDATA%\Wireshark\plugins` while the
+global plugin folder is `WIRESHARK\plugins`.
 
 ### Contributing
 
