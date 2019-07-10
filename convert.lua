@@ -38,11 +38,35 @@ convert_prot.fields = {
 tcp_stream_f            = Field.new('tcp.stream')
 ip_src_f                = Field.new('ip.src')
 ip_dst_f                = Field.new('ip.dst')
+ipv6_src_f              = Field.new('ipv6.src')
+ipv6_dst_f              = Field.new('ipv6.dst')
 tcp_srcport_f           = Field.new('tcp.srcport')
 tcp_dstport_f           = Field.new('tcp.dstport')
 tcp_syn_f               = Field.new('tcp.flags.syn')
 tcp_ack_f               = Field.new('tcp.flags.ack')
 tcp_len_f               = Field.new('tcp.len')
+
+-- For packet for both ipv6 and ipv4, we need to check its availability here
+function get_ip_src()
+	local ip_src = ip_src_f()
+	local ipv6_src = ipv6_src_f()
+	if ip_src then 
+		return ip_src
+	elseif ipv6_src then 
+		return ipv6_src
+	end
+end
+
+-- For packet for both ipv6 and ipv4, we need to check its availability here
+function get_ip_dst()
+	local ip_dst = ip_dst_f()
+	local ipv6_dst = ipv6_dst_f()
+	if ip_dst then
+		return ip_dst
+	elseif ipv6_dst then 
+		return ipv6_dst
+	end
+end
 
 function get_tlv_name(tlv_type)
     local tlv_name = 'Unknown TLV Type'
@@ -78,8 +102,8 @@ end
 
 function get_stream_dir_key()
     return tostring(tcp_stream_f()) ..
-           tostring(ip_src_f()) ..
-           tostring(ip_dst_f()) ..
+           tostring(get_ip_src()) ..
+           tostring(get_ip_dst()) ..
            tostring(tcp_srcport_f()) ..
            tostring(tcp_dstport_f())
 end
