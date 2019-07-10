@@ -102,9 +102,7 @@ end
 
 function get_stream_dir_key()
     return tostring(tcp_stream_f()) ..
-           --tostring(ip_src_f()) ..
            tostring(get_ip_src()) ..
-           --tostring(ip_dst_f()) ..
            tostring(get_ip_dst()) ..
            tostring(tcp_srcport_f()) ..
            tostring(tcp_dstport_f())
