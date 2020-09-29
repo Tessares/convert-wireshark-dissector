@@ -50,9 +50,9 @@ tcp_len_f               = Field.new('tcp.len')
 function get_ip_src()
 	local ip_src = ip_src_f()
 	local ipv6_src = ipv6_src_f()
-	if ip_src then 
+	if ip_src then
 		return ip_src
-	elseif ipv6_src then 
+	elseif ipv6_src then
 		return ipv6_src
 	end
 end
@@ -63,7 +63,7 @@ function get_ip_dst()
 	local ipv6_dst = ipv6_dst_f()
 	if ip_dst then
 		return ip_dst
-	elseif ipv6_dst then 
+	elseif ipv6_dst then
 		return ipv6_dst
 	end
 end
@@ -113,22 +113,6 @@ function is_past_convert_msg(key, pkt_num)
            pkt_num > convert_end_pkt_num[key]
 end
 
--- Assume for the time being that any TCP stream that starts with a SYN with
--- a payload carries Convert data.
-function is_convert_syn()
-    return tostring(tcp_syn_f()) == '1' and
-           tostring(tcp_ack_f()) == '0' and
-           tostring(tcp_len_f()) ~= '0'
-end
-
-function belongs_to_convert_stream()
-    return is_convert_stream[tostring(tcp_stream_f())] == true
-end
-
-function mark_stream_as_convert()
-    is_convert_stream[tostring(tcp_stream_f())] = true
-end
-
 function parse_tlv_value(tlv_tree, tlv_type, buffer, val_offset, val_length)
     if tlv_type == TLV_TYPE_CONNECT then
         tlv_tree:add(connect_port_f, buffer(val_offset, 2))
@@ -153,7 +137,6 @@ end
 -- each direction for each tcp.stream. For the moment, we assume the first pkt
 -- with Convert data contains the full Convert message.
 convert_end_pkt_num = {}
-is_convert_stream = {}
 
 function convert_prot.dissector(buffer, pinfo, tree)
     -- Empty TCP packets, cannot be Convert. Ignore.
@@ -165,16 +148,6 @@ function convert_prot.dissector(buffer, pinfo, tree)
     -- Past the end of the Convert message. Ignore.
     local stream_dir_key = get_stream_dir_key()
     if is_past_convert_msg(stream_dir_key, pinfo.number) then
-        return
-    end
-
-    -- Assume Convert Header sits in the SYN. Otherwise Ignore.
-    if is_convert_syn() then
-        mark_stream_as_convert()
-    end
-
-    -- Does not belong to a Convert stream. Ignore.
-    if not belongs_to_convert_stream() then
         return
     end
 
